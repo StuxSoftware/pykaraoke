@@ -17,7 +17,7 @@ class Time(namedtuple("_Time", "start end")):
 		"""
 		return self.__class__(self.start - start, self.end - end)
 	
-	def shift(self, delta: int):
+	def shift(self, delta: int) -> object:
 		"""
 		Shifts the time.
 		"""

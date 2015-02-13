@@ -3,6 +3,7 @@
 from collections import namedtuple
 from functools import wraps
 import inspect
+import sys
 
 from pykaraoke.executors import BaseExecutor
 
@@ -22,6 +23,14 @@ class BaseTemplater(object):
 		
 		self.types = {}
 		self.templates = []
+		
+	def run(self, args: tuple=None) -> int:
+		"""
+		Runs the software. Returns the return status-code.
+		"""
+		if args is None:
+			args = sys.argv
+		return 0
 		
 	def register_type(self, type: str, executor: BaseExecutor) -> None:
 		"""
