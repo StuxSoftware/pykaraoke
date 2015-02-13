@@ -3,6 +3,9 @@
 from collections import namedtuple
 from functools import wraps
 import inspect
+
+from pykaraoke.executors import BaseExecutor
+
 __author__ = "stux!"
 
 Template = namedtuple("Template", "type func settings")
@@ -20,6 +23,12 @@ class BaseTemplater(object):
 		self.types = {}
 		self.templates = []
 		
+	def register_type(self, type: str, executor: BaseExecutor) -> None:
+		"""
+		Registers a new type
+		"""
+		self.types[type] = executor
+		
 	def _register_template(self, type: str, func: callable, args: tuple, settings: dict) -> None:
 		"""
 		Registers a new template.
@@ -34,7 +43,7 @@ class BaseTemplater(object):
 		"""
 		Registers a new template
 		"""
-		def _decorator(func):
+		def _decorator(func: callable) -> callable:
 			# Make sure we get a generator as the templater
 			# will be iterate over the template executors.
 			if inspect.isgeneratorfunction(func):
@@ -42,10 +51,12 @@ class BaseTemplater(object):
 			else:
 				@wraps(func)
 				def _wrapper(*fargs, *fkwargs):
+					# Ensure we have a generator.
 					res = func(*fargs, *fkwargs)
 					if inspect.isgenerator(res):
-						res = yield from res
-					return res
+						yield from res
+					else:
+						yield res
 			self._register_template(type, _wrapper, args, kwargs)
 			return func
 		return _decorator
