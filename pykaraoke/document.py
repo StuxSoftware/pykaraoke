@@ -1,57 +1,16 @@
 #! /usr/bin/env python3
-from collections import namedtuple, OrderedDict
-from operator import itemgetter
+import re
+from collections import namedtuple
+
+from pykaraoke.parser import document
 
 
-class Time(tuple):
-    """Time(start, end)'"""
-
+class Time(namedtuple("BaseTime", "start end")):
     __slots__ = ()
 
-    _fields = ('start', 'end')
-
-    def __new__(cls, start, end):
-        """Create new instance of Time(start, end)'"""
-        return tuple.__new__(cls, (start, end))
-
-    @classmethod
-    def _make(cls, iterable, new=tuple.__new__, len=len):
-        """Make a new Time object from a sequence or iterable'"""
-        result = new(cls, iterable)
-        if len(result) != 2:
-            raise TypeError('Expected 2 arguments, got %d' % len(result))
-        return result
-
-    def _replace(self, **kwds):
-        """Return a new Time object replacing specified fields with new values'"""
-        result = self._make(map(kwds.pop, ('start', 'end'), self))
-        if kwds:
-            raise ValueError('Got unexpected field names: %r' % list(kwds))
-        return result
-
-    def __repr__(self):
-        """Return a nicely formatted representation string'"""
-        return self.__class__.__name__ + '(start=%r, end=%r)' % self
-
     @property
-    def __dict__(self):
-        """A new OrderedDict mapping field names to their values'"""
-        return OrderedDict(zip(self._fields, self))
-
-    def _asdict(self):
-        """Return a new OrderedDict which maps field names to their values.'"""
-        return self.__dict__
-
-    def __getnewargs__(self):
-        """Return self as a plain tuple.  Used by copy and pickle.'"""
-        return tuple(self)
-
-    def __getstate__(self):
-        """Exclude the OrderedDict from pickling'"""
-        return None
-
-    start = property(itemgetter(0), doc='Alias for field number 0')
-    end = property(itemgetter(1), doc='Alias for field number 1')
+    def duration(self):
+        return self.end - self.end
 
     def retime(self, *, start: int=0, end: int=0) -> object:
         """
@@ -67,4 +26,83 @@ class Time(tuple):
 
 
 Margins = namedtuple("Margins", "l r v")
-Line = namedtuple("Line", "type style margins time actor effect line")
+Line = namedtuple("Line", "style margins time actor effect line")
+
+
+class Document(object):
+    """
+    Parser for the document.
+    """
+
+    def __init__(self, fp):
+        self.styles, self.syllables = self.loadfile(fp)
+
+    def dumpfile(self) -> None:
+        """
+        The dumped file.
+        """
+        pass
+
+    @staticmethod
+    def loadfile(fp: open) -> (document.Style, Line):
+        cdoc = document.Document.parse_file(fp)
+
+        lines = []
+        for event in cdoc.events:
+            if not isinstance(event, document.Dialogue):
+                continue
+            line = Line(
+                style=event.style,
+                margins=Document.parse_magins(event),
+                time=Time(event.start, event.end),
+                actor=event.name,
+                effect=event.effect,
+                line=event.text
+            )
+            lines.append(line)
+
+        return cdoc.styles, lines
+
+    @staticmethod
+    def parse_magins(event: document.Dialogue) -> Margins:
+        """
+        Parses the margins
+        :param event:  The event
+        :return:       The margins
+        """
+        def _decide_source(
+                event: document.Dialogue, style: document.Style,
+                type: str
+        ) -> int:
+            # Decide from which source we should get our margins.
+            evt_m = getattr(event, "margin_" + type)
+            if evt_m == 0:
+                return getattr(style, "margin_" + type)
+            return evt_m
+
+        return Margins(
+            **{t: _decide_source(event, event.style, t) for t in "lrv"}
+        )
+
+
+class Syllable(namedtuple("BaseSyllable", "time line text")):
+    """
+    Represents a single syllable.
+    """
+
+    # The regex that will match correctly formatted syllable lines.
+    SYLLABLE_REGEX = re.compile(r"\{\\[Kk][of]?(\d+)}([^{]*)")
+
+    @classmethod
+    def parse_line(cls, line: Line) -> Syllable:
+        """
+        Parses the line.
+        :param line:   The line that should be parsed.
+        :return:       A generator for all syllables.
+        """
+        cur_time = line.time.start*10
+        for match in cls.SYLLABLE_REGEX.finditer(line.line):
+            dur, text = match.groups()
+            end_time = cur_time + dur
+            yield cls(Time(cur_time, end_time), line, text)
+            cur_time = end_time
