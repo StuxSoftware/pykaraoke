@@ -6,6 +6,7 @@ import inspect
 import sys
 
 from pykaraoke.executors import BaseExecutor
+from pykaraoke.document import Document, Line
 
 __author__ = "stux!"
 
@@ -24,12 +25,55 @@ class BaseTemplater(object):
         self.types = {}
         self.templates = []
 
+    def process_lines(self, line_iter: Line) -> Line:
+        """
+        Processes the raw lines.
+        :param line_iter: The input iterator.
+        :return: The return file.
+        """
+        pass
+
+    def run_for_file(self, fin: open, fout: open) -> None:
+        """
+        The file object.
+        :param fin: The input file.
+        :param fout: The output file.
+        """
+        idoc = Document(fin)
+
+
     def run(self, args: tuple=None) -> int:
         """
-        Runs the software. Returns the return status-code.
+        Runs the effect. Returns the status-code.
         """
         if args is None:
-            args = sys.argv
+            args = sys.argv[1:]
+
+        # If we get no arguments provided, we will assume
+        # we get an ASS-File streamed into stdin
+        # and will return the ASS-File from stdout.
+        fin = sys.stdin
+        fout = sys.stdout
+
+        state = None
+        for arg in args:
+            if state == "INPUT":
+                fin = open(arg, "r")
+            elif state == "OUTPUT":
+                fout = open(arg, "w")
+            else:
+                # To make this code easier understandable,
+                # we will use an else instead of yet more elifs.
+                if arg in ["--input", "-i"]:
+                    state = "INPUT"
+                elif arg in ["--output", "-o"]:
+                    state = "OUTPUT"
+                elif arg == "--":
+                    fout = sys.stdout
+
+        # Run the effect with the given streams.
+        self.run_for_file(fin, fout)
+
         return 0
 
     def register_type(self, type: str, executor: BaseExecutor) -> None:
@@ -71,5 +115,3 @@ class BaseTemplater(object):
             return func
         return _decorator
     add = __call__
-	
-	
