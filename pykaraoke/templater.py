@@ -60,18 +60,16 @@ class BaseTemplater(object):
                 _wrapper = func
             else:
                 @wraps(func)
-                def _wrapper(*fargs, *fkwargs):
+                def _wrapper(*fargs, **fkwargs):
                     # Ensure we have a generator.
-                    res = func(*fargs, *fkwargs)
+                    res = func(*fargs, **fkwargs)
                     if inspect.isgenerator(res):
                         yield from res
                     else:
                         yield res
             self._register_template(type, _wrapper, args, kwargs)
             return func
-
         return _decorator
-
     add = __call__
 	
 	
