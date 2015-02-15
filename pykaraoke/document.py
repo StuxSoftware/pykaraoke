@@ -34,14 +34,23 @@ class Document(object):
     Parser for the document.
     """
 
-    def __init__(self, fp):
-        self.styles, self.syllables = self.loadfile(fp)
+    def __init__(self, fp=None):
+        if fp is not None:
+            self.styles, self.lines = self.loadfile(fp)
+        else:
+            self.styles = []
+            self.lines = []
 
-    def dumpfile(self) -> None:
+    def dumpfile(self, fp) -> None:
         """
         The dumped file.
         """
-        pass
+
+        wdoc = document.Document()
+        wdoc.styles = self.styles[:]
+        wdoc.events = [
+            document.Dialogue()
+        ]
 
     @staticmethod
     def loadfile(fp: open) -> (document.Style, Line):
